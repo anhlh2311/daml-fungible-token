@@ -1,0 +1,207 @@
+module Tests.AllocationDvPTest where
+
+import Daml.Script
+import DA.Time
+import DA.Optional
+-- import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+
+-- import Fungible.TokenHolding
+import Fungible.TokenAllocationFactory
+
+import Shared.Utils
+
+
+setupAllocationDvP : Script AllocatedDvP
+setupAllocationDvP = script do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  let amuletId = registry.instrumentId
+
+  TokenSetup{..} <- setupToken "USDC" "fungible-admin" InitBalances with aliceAmts = []; bobAmts = [1000.0]; charlieAmts = []
+
+  provider <- allocatePartyExact "provider"
+
+  -- give Amulet funds to both parties
+  AmuletRegistry.tapFaucet registry alice 1000.0
+  -- AmuletRegistry.tapFaucet registry bob 1000.0
+
+  now <- getTime
+
+  pure AllocatedDvP with
+    alice
+    bob
+    provider
+    now
+    amuletRegistry = registry
+    amuletId
+    fungibleId = instrumentId
+    fungibleMetadata = tokenMeta
+
+
+-- | End-to-end DvP allocation and settlement across Amulet and USDC (fungible).
+testAllocationDvP : Script ()
+testAllocationDvP = script do
+  AllocatedDvP{..} <- setupAllocationDvP
+
+  -- Build transfer legs
+  let mkTransfer sender receiver instrumentId amount meta = AllocationV1.TransferLeg with
+        sender
+        receiver
+        amount
+        instrumentId
+        meta
+
+  -- Alice transfers Amulet to Bob
+  let aliceLeg = mkTransfer alice bob amuletId 100.0 Api.Token.MetadataV1.emptyMetadata
+  -- Bob transfers USDC to Alice
+  let bobLeg = mkTransfer bob alice fungibleId 20.0 fungibleMetadata
+
+  debug $ "Alice leg: " <> show aliceLeg
+  debug $ "Bob leg: " <> show bobLeg
+
+  -- Common settlement info
+  now <- getTime
+  let settlement = AllocationV1.SettlementInfo with
+        executor = provider
+        settlementRef = AllocationV1.Reference with id = "dvp-otc-1"; cid = None
+        requestedAt = now
+        allocateBefore = now `addRelTime` minutes 10
+        settleBefore = now `addRelTime` hours 1
+        meta = Api.Token.MetadataV1.emptyMetadata
+
+  debug $ "Settlement: " <> show settlement
+
+  let aliceSpec = AllocationV1.AllocationSpecification with
+        settlement
+        transferLegId = "leg0"
+        transferLeg = aliceLeg
+
+  let bobSpec = AllocationV1.AllocationSpecification with
+        settlement
+        transferLegId = "leg1"
+        transferLeg = bobLeg
+
+  debug $ "Alice spec: " <> show aliceSpec
+  debug $ "Bob spec: " <> show bobSpec
+
+  -- Alice allocates Amulet via registry factory
+  aliceHoldings <- queryInterface @HoldingV1.Holding alice
+  let aliceInputCids = [ cid | (cid, Some hv) <- aliceHoldings, hv.instrumentId == amuletId, hv.owner == alice, isNone (hv.lock) ]
+
+  debug "--------------------------------"
+  debug $ "Alice allocates Amulet via registry factory"
+  debug $ "Alice holdings: " <> show aliceHoldings
+  debug $ "Alice input cids: " <> show aliceInputCids
+
+  enrichedAlice <- RegistryApi.getAllocationFactory amuletRegistry AllocationInstructionV1.AllocationFactory_Allocate with
+    expectedAdmin = amuletRegistry.dso
+    allocation = aliceSpec
+    requestedAt = now
+    inputHoldingCids = aliceInputCids
+    extraArgs = Splice.Testing.Utils.emptyExtraArgs
+
+  debug $ "Enriched alice factory cid: " <> show enrichedAlice.factoryCid
+  debug $ "Enriched alice arg: " <> show enrichedAlice.arg
+
+  aliceResult <- Splice.Testing.Utils.submitWithDisclosures' alice enrichedAlice.disclosures $
+    exerciseCmd enrichedAlice.factoryCid enrichedAlice.arg
+
+  debug $ "Alice allocation instruction result: " <> show aliceResult
+  
+  let aliceResult' : AllocationInstructionV1.AllocationInstructionResult = aliceResult
+  aliceAllocCid <- case aliceResult'.output of
+    AllocationInstructionV1.AllocationInstructionResult_Completed {allocationCid} -> pure allocationCid
+    _ -> abort "expected completed allocation for alice leg"
+
+  -- Bob allocates USDC via fungible TokenAllocationFactory
+  let fungibleAdmin = fungibleId.admin
+
+  debug "--------------------------------"
+  debug $ "Creating fungible TokenAllocationFactory"
+  debug $ "fungibleAdmin: " <> show fungibleAdmin
+  debug $ "fungibleId: " <> show fungibleId
+  factoryCid <- submit fungibleAdmin $ createCmd TokenAllocationFactory with
+    admin = fungibleAdmin
+    meta = fungibleMetadata
+  debug $ "Created fungible TokenAllocationFactory: " <> show factoryCid
+
+  bobHoldings <- queryInterface @HoldingV1.Holding bob
+  let bobInputCids = [ cid | (cid, Some hv) <- bobHoldings, hv.instrumentId == fungibleId, hv.owner == bob, isNone (hv.lock) ]
+  
+  debug "--------------------------------"
+  debug $ "Bob allocates USDC via fungible TokenAllocationFactory"
+  debug $ "Bob holdings: " <> show bobHoldings
+  debug $ "Bob input cids: " <> show bobInputCids
+
+  -- Create a disclosure for the fungible TokenAllocationFactory
+  factoryDisc <- Splice.Testing.Utils.queryDisclosure' @TokenAllocationFactory fungibleAdmin factoryCid
+
+  let bobAllocationExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = fungibleMetadata
+        context = Api.Token.MetadataV1.emptyChoiceContext
+  
+  -- Create a disclosure for the fungible TokenAllocationFactory
+  bobResult <- Splice.Testing.Utils.submitWithDisclosures' bob factoryDisc $ 
+    exerciseCmd (toInterfaceContractId @AllocationInstructionV1.AllocationFactory factoryCid) 
+      AllocationInstructionV1.AllocationFactory_Allocate with
+        expectedAdmin = fungibleAdmin
+        allocation = bobSpec
+        requestedAt = now
+        inputHoldingCids = bobInputCids
+        extraArgs = bobAllocationExtraArgs
+
+  debug $ "Bob allocation instruction result: " <> show bobResult
+
+  let bobResult' : AllocationInstructionV1.AllocationInstructionResult = bobResult
+  bobAllocCid <- case bobResult'.output of
+    AllocationInstructionV1.AllocationInstructionResult_Completed {allocationCid} -> pure allocationCid
+    _ -> abort "expected completed allocation for bob leg"
+
+  -- Execute both allocations (DvP)
+  -- For Amulet allocation, fetch required OpenAPI context (amulet-rules, open-round)
+  aliceCtx <- RegistryApi.getAllocation_TransferContext amuletRegistry aliceAllocCid Api.Token.MetadataV1.emptyMetadata
+  let aliceExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = Api.Token.MetadataV1.emptyMetadata
+        context = aliceCtx.choiceContext
+
+  _ <- submitMulti [provider, alice, bob] [amuletRegistry.dso] $ exerciseCmd
+    aliceAllocCid
+    AllocationV1.Allocation_ExecuteTransfer with
+      extraArgs = aliceExtraArgs
+
+  -- USDC allocation does not require special context
+  let bobExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = fungibleMetadata
+        context = Api.Token.MetadataV1.emptyChoiceContext
+
+  _ <- submitMulti [provider, alice, bob] [] $ exerciseCmd
+    bobAllocCid
+    AllocationV1.Allocation_ExecuteTransfer with
+      extraArgs = bobExtraArgs
+
+  -- Basic post-conditions
+  -- USDC receiver holding for alice with 20.0 exists
+  usdcHoldingsAlice <- queryInterface @HoldingV1.Holding alice
+  let usdcReceived = any (\(_, Some hv) -> hv.instrumentId == fungibleId && hv.owner == alice && hv.amount == 20.0) usdcHoldingsAlice
+  if usdcReceived then pure () else abort "expected alice to receive 20.0 USDC"
+
+  aliceUSDCBalance <- balanceOf alice fungibleId
+  aliceAmuletBalance <- balanceOf alice amuletId
+  bobUSDCBalance <- balanceOf bob fungibleId
+  bobAmuletBalance <- balanceOf bob amuletId
+  debug $ "Alice USDC balance: " <> show aliceUSDCBalance
+  debug $ "Alice Amulet balance: " <> show aliceAmuletBalance
+  debug $ "Bob USDC balance: " <> show bobUSDCBalance
+  debug $ "Bob Amulet balance: " <> show bobAmuletBalance
+
+  -- No outstanding allocations
+  [] <- queryInterface @AllocationV1.Allocation provider
+  pure ()

@@ -1,6 +1,6 @@
 module Fungible.TokenAllocation where
 
-import DA.Optional (isNone)
+import DA.Optional (isSome)
 
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
@@ -28,7 +28,7 @@ template TokenAllocation
         locked <- fetch lockedHoldingCid
         assertMsg "Locked holding must belong to sender" (locked.owner == allocation.transferLeg.sender)
         assertMsg "Locked holding must have correct instrument" (locked.instrumentId == allocation.transferLeg.instrumentId)
-        assertMsg "Locked holding must be locked" (not (isNone locked.lock))
+        assertMsg "Locked holding must be locked" (isSome (locked.lock))
 
         -- Consume the locked holding
         archive lockedHoldingCid
@@ -46,6 +46,7 @@ template TokenAllocation
           senderHoldingCids = []
           receiverHoldingCids = [toInterfaceContractId receiverHoldingCid]
           meta = extraArgs.meta
+
 
       allocation_withdrawImpl _self Api.Token.AllocationV1.Allocation_Withdraw{..} = do
         locked <- fetch lockedHoldingCid

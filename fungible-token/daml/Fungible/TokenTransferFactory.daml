@@ -1,8 +1,6 @@
 module Fungible.TokenTransferFactory where
 
-import DA.Time
 import DA.Optional (isNone)
-import DA.List (null)
 import DA.Foldable (forA_)
 import DA.Traversable qualified as Traversable
 
@@ -31,6 +29,7 @@ template TokenTransferFactory with
         now <- getTime
         
         -- Validate transfer
+        assertMsg "Expected admin must match transfer factory admin" (arg.expectedAdmin == admin)
         assertMsg "Valid instrument" (transfer.instrumentId.admin == admin)
         assertMsg "Positive amount" (transfer.amount > 0.0)
         assertMsg "Valid timing" (transfer.executeBefore > now)

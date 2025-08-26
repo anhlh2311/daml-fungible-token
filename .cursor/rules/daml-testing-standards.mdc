@@ -1,0 +1,48 @@
+# Daml Testing Standards
+
+## Test Structure
+
+- Use descriptive test names explaining the scenario: `testComponentActionScenario`
+- Follow pattern: `componentActionTest` for test functions
+- Include comprehensive setup and teardown
+- Test both success and error conditions
+
+## Test Documentation
+
+- Document test purpose with `-- |` comments
+- Group related tests together with clear section comments
+- Use clear section comments: `-- ====================`
+- Maintain logical flow from setup to verification
+
+## Test Organization
+
+- Use `Daml.Script` for test execution
+- Create shared setup functions in [Shared/Utils.daml](/fungible-token-test/daml/Shared/Utils.daml)
+- Use descriptive party names: `alice`, `bob`, `charlie`, `admin`
+- Include debug statements for troubleshooting: `debug $ "message: " <> show value`
+
+## Test Patterns
+
+- Test token issuance and initial balances
+- Test single-step transfers (self-transfers)
+- Test two-step transfers with accept/reject workflow
+- Test allocation DvP scenarios
+- Test error conditions and edge cases
+
+## Assertions and Verification
+
+- Use `queryInterface` to verify contract states
+- Check balance changes after operations
+- Verify metadata propagation
+- Test expiration and timeout scenarios
+
+## Integration Testing
+
+- Use Splice testing utilities from [external-test-sources/](/external-test-sources/)
+- Test against Amulet reference implementation
+- Verify interface compliance with Splice APIs
+description:
+globs:
+alwaysApply: false
+
+---
