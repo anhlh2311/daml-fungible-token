@@ -12,8 +12,7 @@ template TokenHolding with
     meta : Api.Token.MetadataV1.Metadata
   where
     signatory admin, owner
-
-    ensure amount > 0.0
+    ensure admin == instrumentId.admin && amount > 0.0
 
     -- Implement the Holding interface
     interface instance Api.Token.HoldingV1.Holding for TokenHolding where

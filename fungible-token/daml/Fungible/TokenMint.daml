@@ -1,0 +1,29 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Fungible.TokenMint where
+
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
+
+import Fungible.TokenHolding
+
+template TokenMintRequest
+  with
+    instrumentId: Api.Token.HoldingV1.InstrumentId
+    recipient: Party
+    amount: Decimal
+  where
+    signatory recipient
+    observer instrumentId.admin
+
+    choice AcceptMint: ContractId TokenHolding
+      controller instrumentId.admin
+      do
+        create TokenHolding with
+          admin = instrumentId.admin
+          owner = recipient
+          amount
+          instrumentId
+          lock = None
+          meta = Api.Token.MetadataV1.emptyMetadata -- temporarily empty now, may update later
