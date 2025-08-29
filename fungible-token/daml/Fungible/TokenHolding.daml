@@ -1,7 +1,5 @@
 module Fungible.TokenHolding where
 
-import DA.Optional (isNone, isSome)
-
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
@@ -24,35 +22,3 @@ template TokenHolding with
         amount = amount
         lock = lock
         meta = meta
-
-    choice LockHolding: ContractId TokenHolding
-      with
-        holders: [Party]
-      controller owner
-      do
-        assertMsg "Holding is already locked" (isNone lock)
-        create TokenHolding with
-          admin = admin
-          owner = owner
-          amount = amount
-          instrumentId = instrumentId
-          lock = Some Api.Token.HoldingV1.Lock with
-            holders = holders
-            expiresAt = None
-            expiresAfter = None
-            context = None
-          meta = meta
-
-    choice UnlockHolding: ContractId TokenHolding
-      controller owner :: case lock of
-                  Some l -> l.holders
-                  None -> []
-      do
-        assertMsg "Holding is not locked" (isSome lock)
-        create TokenHolding with
-          admin = admin
-          owner = owner
-          amount = amount
-          instrumentId = instrumentId
-          lock = None
-          meta = meta
