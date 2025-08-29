@@ -26,7 +26,7 @@
 
 - Include complete, runnable code examples
 - Show both success and error scenarios
-- Use syntax highlighting for Daml code blocks
+- Use Haskell syntax highlighting for Daml code blocks
 - Include expected outputs where helpful
 
 ## Project Documentation
