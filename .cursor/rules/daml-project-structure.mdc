@@ -1,0 +1,50 @@
+# Daml Fungible Token Project Structure
+
+This is a Canton Network token standard CIP-0056 implementation for fungible tokens with Splice Amulet integration.
+
+## Core Project Structure
+
+### Main Implementation Package
+
+- [fungible-token/](/fungible-token/) - Main package implementing CIP-0056 interfaces
+  - [daml/Fungible/TokenHolding.daml](/fungible-token/daml/Fungible/TokenHolding.daml) - Core token holding template
+  - [daml/Fungible/TokenTransferInstruction.daml](/fungible-token/daml/Fungible/TokenTransferInstruction.daml) - Single-step transfers
+  - [daml/Fungible/TwoStepTransferInstruction.daml](/fungible-token/daml/Fungible/TwoStepTransferInstruction.daml) - Two-step pending transfers
+  - [daml/Fungible/TokenTransferFactory.daml](/fungible-token/daml/Fungible/TokenTransferFactory.daml) - Transfer factory
+  - [daml/Fungible/TokenAllocation.daml](/fungible-token/daml/Fungible/TokenAllocation.daml) - DvP allocation contracts
+  - [daml/Fungible/TokenAllocationFactory.daml](/fungible-token/daml/Fungible/TokenAllocationFactory.daml) - Allocation factory
+
+### Test Package
+
+- [fungible-token-test/](/fungible-token-test/) - Daml Script tests and helpers
+  - [daml/FungibleTokenTest.daml](/fungible-token-test/daml/FungibleTokenTest.daml) - Main test suite
+  - [daml/AllocationDvPTest.daml](/fungible-token-test/daml/AllocationDvPTest.daml) - DvP allocation tests
+  - [daml/Shared/Utils.daml](/fungible-token-test/daml/Shared/Utils.daml) - Shared test utilities
+
+### External Dependencies
+
+- [dars/](/dars/) - Splice API DARs and dependencies
+- [external-test-sources/](/external-test-sources/) - Upstream testing utilities
+
+### Configuration
+
+- [multi-package.yaml](/multi-package.yaml) - Multi-package build configuration
+- [README.md](/README.md) - Project documentation
+- [WORKFLOW.md](/WORKFLOW.md) - Development workflow guide
+
+## Key Interfaces Implemented
+
+- `HoldingV1` - Token holding interface
+- `TransferInstructionV1` - Transfer instruction interface (TransferFactory + TransferInstruction)
+- `AllocationInstructionV1` - Allocation instruction interface (AllocationFactory)
+- `AllocationV1` - Allocation interface
+
+## Transfer Modes
+
+- **Single-step**: Self-transfers (sender == receiver) for merge/split operations
+- **Two-step**: Cross-party transfers with pre-locked inputs and accept/reject workflow
+description:
+globs:
+alwaysApply: false
+
+---

@@ -1,0 +1,44 @@
+# Daml Coding Standards
+
+## Module Organization
+
+- Use descriptive module names following `Component.Action` pattern
+- Group related functionality in the same module
+- Import statements should be organized: standard library, external packages, internal modules
+
+## Template and Interface Design
+
+- Implement Splice API interfaces (`HoldingV1`, `TransferInstructionV1`, etc.)
+- Use descriptive field names with clear types
+- Include `ensure` clauses for business logic validation
+- Add comprehensive `signatory` and `observer` declarations
+
+## Code Style
+
+- Use camelCase for variable and function names
+- Use PascalCase for template and interface names
+- Include type annotations for complex expressions
+- Use qualified imports for clarity: `import Splice.Api.Token.HoldingV1 qualified as HoldingV1`
+
+## Metadata Handling
+
+- Use `Splice.Api.Token.MetadataV1.Metadata` for extensible metadata
+- Implement proper metadata passing through all operations
+- Use `DA.TextMap` for metadata key-value pairs
+
+## Error Handling
+
+- Use descriptive error messages in `abort` statements
+- Validate inputs with `ensure` clauses
+- Handle optional values with `DA.Optional` utilities
+
+## Documentation
+
+- Use `-- |` for module-level documentation
+- Document complex business logic with inline comments
+- Include examples for public interfaces
+description:
+globs:
+alwaysApply: false
+
+---

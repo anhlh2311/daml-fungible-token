@@ -1,0 +1,44 @@
+# Build and Test Workflow
+
+## Build Commands
+
+- **Multi-package build**: `daml build --all` from repository root
+- **Individual package build**:
+
+  ```bash
+  cd fungible-token
+  daml build
+  cd ../fungible-token-test
+  daml build
+  ```
+
+## Test Execution
+
+- **Run all tests**: `daml test --all` in [fungible-token-test/](/fungible-token-test/)
+- **Specific test file**: `daml test --files daml/FungibleTokenTest.daml`
+- **Test coverage**: Check [fungible-token-coverage](/fungible-token-test/fungible-token-coverage)
+
+## Package Configuration
+
+- [fungible-token/daml.yaml](/fungible-token/daml.yaml) - Main package configuration
+- [fungible-token-test/daml.yaml](/fungible-token-test/daml.yaml) - Test package configuration
+- [multi-package.yaml](/multi-package.yaml) - Multi-package build configuration
+
+## Dependencies
+
+- Splice API DARs in [dars/](/dars/) directory
+- External test sources in [external-test-sources/](/external-test-sources/)
+- Canton or Sandbox for running scripts
+
+## Development Workflow
+
+1. Make changes to implementation in [fungible-token/](/fungible-token/)
+2. Update tests in [fungible-token-test/](/fungible-token-test/)
+3. Build packages: `daml build --all`
+4. Run tests: `daml test --all`
+5. Update documentation as needed
+description:
+globs:
+alwaysApply: false
+
+---

@@ -10,19 +10,19 @@ This document explains the end‑to‑end lifecycle of a fungible token that adh
 
 Key types (from the standard):
 
-- InstrumentId = { admin : Party, id : Text } — identifies a token type
-- Holding — interface view with { owner, instrumentId, amount, lock, meta }
-- Metadata — open TextMap for arbitrary key/value attributes
-- Lock — { holders, expiresAt|expiresAfter, context }
+- **InstrumentId** = `{ admin : Party, id : Text }` — identifies a token type
+- **Holding** — interface view with `{ owner, instrumentId, amount, lock, meta }`
+- **Metadata** — open TextMap for arbitrary key/value attributes
+- **Lock** — `{ holders, expiresAt|expiresAfter, context }`
 
 References:
 
-- [fungible-token/daml/Fungible/TokenHolding.daml](mdc:fungible-token/daml/Fungible/TokenHolding.daml)
-- [fungible-token/daml/Fungible/TokenTransferFactory.daml](mdc:fungible-token/daml/Fungible/TokenTransferFactory.daml)
-- [fungible-token/daml/Fungible/TokenTransferInstruction.daml](mdc:fungible-token/daml/Fungible/TokenTransferInstruction.daml)
-- [fungible-token/daml/Fungible/TwoStepTransferInstruction.daml](mdc:fungible-token/daml/Fungible/TwoStepTransferInstruction.daml)
-- [fungible-token/daml/Fungible/TokenAllocationFactory.daml](mdc:fungible-token/daml/Fungible/TokenAllocationFactory.daml)
-- [fungible-token/daml/Fungible/TokenAllocation.daml](mdc:fungible-token/daml/Fungible/TokenAllocation.daml)
+- [fungible-token/daml/Fungible/TokenHolding.daml](/fungible-token/daml/Fungible/TokenHolding.daml)
+- [fungible-token/daml/Fungible/TokenTransferFactory.daml](/fungible-token/daml/Fungible/TokenTransferFactory.daml)
+- [fungible-token/daml/Fungible/TokenTransferInstruction.daml](/fungible-token/daml/Fungible/TokenTransferInstruction.daml)
+- [fungible-token/daml/Fungible/TwoStepTransferInstruction.daml](/fungible-token/daml/Fungible/TwoStepTransferInstruction.daml)
+- [fungible-token/daml/Fungible/TokenAllocationFactory.daml](/fungible-token/daml/Fungible/TokenAllocationFactory.daml)
+- [fungible-token/daml/Fungible/TokenAllocation.daml](/fungible-token/daml/Fungible/TokenAllocation.daml)
 
 ## Phase 1 — Instrument setup
 
@@ -53,7 +53,7 @@ submitMulti [admin, alice] [] $ createCmd TokenHolding with
 
 ### Single‑step transfer (self‑transfer)
 
-- Applied when sender == receiver. This is a merge/split flow handled by [TokenTransferInstruction.daml](mdc:fungible-token/daml/Fungible/TokenTransferInstruction.daml).
+- Applied when `sender == receiver`. This is a merge/split flow handled by [TokenTransferInstruction.daml](/fungible-token/daml/Fungible/TokenTransferInstruction.daml).
 - Inputs are validated and archived at accept; any change is returned; result is Completed with receiver holding(s).
 
 Initiation:
@@ -81,7 +81,7 @@ Expiry:
 
 ### Two‑step transfer (pending acceptance)
 
-- Applied when sender != receiver. Implemented by [TokenTransferFactory.daml](mdc:fungible-token/daml/Fungible/TokenTransferFactory.daml) and [TwoStepTransferInstruction.daml](mdc:fungible-token/daml/Fungible/TwoStepTransferInstruction.daml).
+- Applied when sender != receiver. Implemented by [TokenTransferFactory.daml](/fungible-token/daml/Fungible/TokenTransferFactory.daml) and [TwoStepTransferInstruction.daml](/fungible-token/daml/Fungible/TwoStepTransferInstruction.daml).
 - At instruction creation:
   - Validates specified inputs belong to sender, unlocked, and match instrument
   - Archives inputs; returns change immediately to sender (if any)
@@ -116,7 +116,7 @@ Notes:
 
 ## Phase 4 — DvP allocations
 
-Implemented by [TokenAllocationFactory.daml](mdc:fungible-token/daml/Fungible/TokenAllocationFactory.daml) and [TokenAllocation.daml](mdc:fungible-token/daml/Fungible/TokenAllocation.daml).
+Implemented by [TokenAllocationFactory.daml](/fungible-token/daml/Fungible/TokenAllocationFactory.daml) and [TokenAllocation.daml](/fungible-token/daml/Fungible/TokenAllocation.daml).
 
 1) Allocate (executor/venue):
    - Validate `expectedAdmin`, timing
@@ -166,7 +166,7 @@ exerciseCmd (toInterfaceContractId @AllocInstrV1.AllocationFactory allocFactoryC
 
 ## Test coverage
 
-See [fungible-token-test/daml/FungibleTokenTest.daml](mdc:fungible-token-test/daml/FungibleTokenTest.daml):
+See [fungible-token-test/daml/FungibleTokenTest.daml](/fungible-token-test/daml/FungibleTokenTest.daml):
 
 - `setupToken`: shared initializer for parties, instrument, issuances
 - `testFungibleIssuanceAndTransfer`: issuance, two‑step/single‑step transfers, balances
@@ -224,6 +224,7 @@ sequenceDiagram
   participant AF as AllocationFactory
   participant A as Allocation
   participant L as LockedHolding
+  participant R as Receiver
 
   E->>AF: AllocationFactory_Allocate (allocation spec, inputs)
   AF->>AF: Validate and archive inputs, then return change
@@ -231,6 +232,7 @@ sequenceDiagram
   AF-->>E: AllocationInstructionResult (Completed, allocationCid)
 
   E->>A: Allocation_ExecuteTransfer
-  A->>L: Archive lock and create receiver holdings
+  A->>L: Archive lock
+  A-->>R: Create receiver holding
   A-->>E: Allocation_ExecuteTransferResult
 ```

@@ -24,65 +24,67 @@ template TokenAllocationFactory
         admin = admin
         meta = meta
 
-      allocationFactory_allocateImpl _self Api.Token.AllocationInstructionV1.AllocationFactory_Allocate{..} = do
+      allocationFactory_allocateImpl _self arg = do
         now <- getTime
-        assertMsg "Expected admin must match actual admin" (expectedAdmin == admin)
-        assertMsg "Valid instrument" (allocation.transferLeg.instrumentId.admin == admin)
-        assertMsg "Valid timing" (allocation.settlement.allocateBefore > now)
+        assertMsg "Expected admin must match actual admin" (arg.expectedAdmin == admin)
+        assertMsg "Valid instrument" (arg.allocation.transferLeg.instrumentId.admin == admin)
+        assertMsg "Valid timing" (arg.allocation.settlement.allocateBefore > now)
 
         -- Lock funds: sum the provided holdings, archive them, and create a single locked holding
         -- If no inputs specified, fail (we keep implementation simple)
-        assertMsg "Must provide input holdings" (not (null inputHoldingCids))
+        assertMsg "Must provide input holdings" (not (null arg.inputHoldingCids))
 
         -- Fetch holdings and validations, accumulating total amount while archiving
         total <- foldlA (\acc cid -> do
           holding <- fetch @TokenHolding (coerceContractId cid)
-          assertMsg "Holding must belong to sender" (holding.owner == allocation.transferLeg.sender)
-          assertMsg "Holding must have correct instrument" (holding.instrumentId == allocation.transferLeg.instrumentId)
+          assertMsg "Holding must belong to sender" (holding.owner == arg.allocation.transferLeg.sender)
+          assertMsg "Holding must have correct instrument" (holding.instrumentId == arg.allocation.transferLeg.instrumentId)
           assertMsg "Holding must be unlocked" (isNone holding.lock)
           archive cid
-          pure (acc + holding.amount)) 0.0 inputHoldingCids
+          pure (acc + holding.amount)) 0.0 arg.inputHoldingCids
 
-        assertMsg "Insufficient balance for allocation" (total >= allocation.transferLeg.amount)
+        assertMsg "Insufficient balance for allocation" (total >= arg.allocation.transferLeg.amount)
 
         -- Create change back to sender if any
-        senderChangeCids <- if total > allocation.transferLeg.amount then do
+        senderChangeCids <- if total > arg.allocation.transferLeg.amount then do
           changeCid <- create TokenHolding with
             admin = admin
-            owner = allocation.transferLeg.sender
-            amount = total - allocation.transferLeg.amount
-            instrumentId = allocation.transferLeg.instrumentId
+            owner = arg.allocation.transferLeg.sender
+            amount = total - arg.allocation.transferLeg.amount
+            instrumentId = arg.allocation.transferLeg.instrumentId
             lock = None
-            meta = extraArgs.meta
+            meta = arg.extraArgs.meta
           pure [toInterfaceContractId changeCid]
         else pure []
 
         -- Create a locked holding representing the allocated amount
         let allocLock = Some Api.Token.HoldingV1.Lock with
-              holders = [allocation.settlement.executor]
-              expiresAt = Some allocation.settlement.settleBefore
+              holders = [arg.allocation.settlement.executor]
+              expiresAt = Some arg.allocation.settlement.settleBefore
               expiresAfter = None
-              context = Some (Text.implode ["allocation for transfer leg ", show allocation.transferLegId, " to ", show allocation.transferLeg.receiver])
+              context = Some (Text.implode ["allocation for transfer leg ", show arg.allocation.transferLegId, " to ", show arg.allocation.transferLeg.receiver])
+        
+        debug $ "Creating locked holding for allocation: " <> show allocLock
         lockedCid <- create TokenHolding with
           admin = admin
-          owner = allocation.transferLeg.sender
-          amount = allocation.transferLeg.amount
-          instrumentId = allocation.transferLeg.instrumentId
+          owner = arg.allocation.transferLeg.sender
+          amount = arg.allocation.transferLeg.amount
+          instrumentId = arg.allocation.transferLeg.instrumentId
           lock = allocLock
-          meta = extraArgs.meta
+          meta = arg.extraArgs.meta
 
         -- Create allocation contract pointing at the locked holding
         allocationCid <- create TokenAllocation with
-          allocation
+          allocation = arg.allocation
           lockedHoldingCid = lockedCid
-          meta = extraArgs.meta
+          meta = arg.extraArgs.meta
 
         pure Api.Token.AllocationInstructionV1.AllocationInstructionResult with
           output = Api.Token.AllocationInstructionV1.AllocationInstructionResult_Completed with
             allocationCid = toInterfaceContractId allocationCid
           senderChangeCids = senderChangeCids
-          meta = extraArgs.meta
+          meta = arg.extraArgs.meta
 
-      allocationFactory_publicFetchImpl _self Api.Token.AllocationInstructionV1.AllocationFactory_PublicFetch{..} = do
-        assertMsg "Expected admin must match actual admin" (expectedAdmin == admin)
+      allocationFactory_publicFetchImpl _self arg = do
+        assertMsg "Expected admin must match actual admin" (arg.expectedAdmin == admin)
         pure (view $ toInterface @Api.Token.AllocationInstructionV1.AllocationFactory this)

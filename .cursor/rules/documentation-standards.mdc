@@ -1,0 +1,41 @@
+# Documentation Standards
+
+## Documentation Structure
+
+- Use clear headings and subheadings with proper hierarchy
+- Include code examples where appropriate
+- Reference specific files using [filename](/filename) syntax
+- Maintain consistent formatting throughout
+- Take markdown linter into account
+
+## Content Guidelines
+
+- Explain business logic and workflows clearly
+- Document key design decisions and rationale
+- Include sequence diagrams for complex flows
+- Keep documentation up-to-date with code changes
+- Reference relevant Splice API documentation
+
+## File References
+
+- Use `[filename](/filename)` for internal file references
+- Use `[filename.ext](/path/to/filename.ext)` for files in subdirectories
+- Reference external documentation with proper URLs
+
+## Code Examples
+
+- Include complete, runnable code examples
+- Show both success and error scenarios
+- Use syntax highlighting for Daml code blocks
+- Include expected outputs where helpful
+
+## Project Documentation
+
+- [README.md](/README.md) - Main project overview and setup
+- [WORKFLOW.md](/WORKFLOW.md) - Development workflow and processes
+- Package-specific documentation in respective directories
+description:
+globs:
+alwaysApply: false
+
+---

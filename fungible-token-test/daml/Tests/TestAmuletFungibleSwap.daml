@@ -1,0 +1,138 @@
+module Tests.TestAmuletFungibleSwap where
+
+import Daml.Script
+import DA.Time
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.Apps.TradingApp
+
+import Fungible.TokenAllocationFactory
+
+import Shared.Utils
+
+-- | End-to-end swap: 100 Amulet for 20 USDC using DvP semantics coordinated by TradingApp.
+-- Actors:
+-- - User (alice): onboarded to app provider node; taps Amulet faucet
+-- - Liquidity Provider (bob): provides USDC via Fungible token
+-- - ExchangeApp Provider (provider): venue/executor that executes both legs
+
+testAmuletFungibleSwap : Script ()
+testAmuletFungibleSwap = script do
+  -- Setup Amulet registry and Fungible token (USDC for bob)
+  amuletRegistry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  let amuletId = amuletRegistry.instrumentId
+
+  TokenSetup{..} <- setupToken "USDC" "fungible-admin" InitBalances with aliceAmts = []; bobAmts = [1000.0]; charlieAmts = []
+
+  provider <- allocatePartyExact "exchange-app-provider"
+
+  -- External user onboarded (alice) taps faucet for Amulet
+  AmuletRegistry.tapFaucet amuletRegistry alice 1000.0
+
+  -- Build trade legs (alice→bob 100 Amulet, bob→alice 20 USDC)
+  let mkTransfer sender receiver instrumentId amount meta = AllocationV1.TransferLeg with
+        sender
+        receiver
+        amount
+        instrumentId
+        meta
+  let amuletLeg = mkTransfer alice bob amuletId 100.0 Api.Token.MetadataV1.emptyMetadata
+  let usdcLeg   = mkTransfer bob alice instrumentId 20.0 tokenMeta
+
+  -- Propose OTC trade via TradingApp and accept by both parties
+  proposalCid <- submit alice $ createCmd OTCTradeProposal with
+    venue = provider
+    tradeCid = None
+    transferLegs = TextMap.fromList [("leg-amulet", amuletLeg), ("leg-usdc", usdcLeg)]
+    approvers = [alice]
+
+  proposalCid <- submit bob $ exerciseCmd proposalCid OTCTradeProposal_Accept with approver = bob
+
+  -- Initiate settlement window to create the OTCTrade
+  now <- getTime
+  let prepareUntil = now `addRelTime` minutes 10
+  let settleBefore = now `addRelTime` hours 1
+  _otcTradeCid <- submit provider $ exerciseCmd proposalCid OTCTradeProposal_InitiateSettlement with
+    prepareUntil
+    settleBefore
+
+  -- Each sender sees an allocation request for their instrument
+  [aliceAllocSpec] <- WalletClient.listRequestedAllocations alice amuletId
+  [bobAllocSpec] <- WalletClient.listRequestedAllocations bob instrumentId
+
+  -- Alice allocates Amulet via registry factory using the requested spec
+  aliceHoldings <- WalletClient.listHoldingCids alice amuletId
+  enrichedAlice <- RegistryApi.getAllocationFactory amuletRegistry AllocationInstructionV1.AllocationFactory_Allocate with
+    expectedAdmin = amuletRegistry.dso
+    allocation = aliceAllocSpec
+    requestedAt = now
+    inputHoldingCids = aliceHoldings
+    extraArgs = Splice.Testing.Utils.emptyExtraArgs
+
+  aliceAllocInstrRes <- Splice.Testing.Utils.submitWithDisclosures' alice enrichedAlice.disclosures $
+    exerciseCmd enrichedAlice.factoryCid enrichedAlice.arg
+
+  aliceAllocCid <- case (aliceAllocInstrRes : AllocationInstructionV1.AllocationInstructionResult).output of
+    AllocationInstructionV1.AllocationInstructionResult_Completed {allocationCid} -> pure allocationCid
+    _ -> abort "expected completed allocation for alice leg"
+
+  -- Bob allocates USDC via fungible TokenAllocationFactory using requested spec
+  let fungibleAdmin = instrumentId.admin
+  factoryCid <- submit fungibleAdmin $ createCmd TokenAllocationFactory with
+    admin = fungibleAdmin
+    meta = tokenMeta
+
+  factoryDisc <- Splice.Testing.Utils.queryDisclosure' @TokenAllocationFactory fungibleAdmin factoryCid
+  bobHoldings <- WalletClient.listHoldingCids bob instrumentId
+
+  let bobAllocationExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = tokenMeta
+        context = Api.Token.MetadataV1.emptyChoiceContext
+
+  bobAllocInstrRes <- Splice.Testing.Utils.submitWithDisclosures' bob factoryDisc $
+    exerciseCmd (toInterfaceContractId @AllocationInstructionV1.AllocationFactory factoryCid)
+      AllocationInstructionV1.AllocationFactory_Allocate with
+        expectedAdmin = fungibleAdmin
+        allocation = bobAllocSpec
+        requestedAt = now
+        inputHoldingCids = bobHoldings
+        extraArgs = bobAllocationExtraArgs
+
+  bobAllocCid <- case (bobAllocInstrRes : AllocationInstructionV1.AllocationInstructionResult).output of
+    AllocationInstructionV1.AllocationInstructionResult_Completed {allocationCid} -> pure allocationCid
+    _ -> abort "expected completed allocation for bob leg"
+
+  -- Execute both allocations (DvP swap) explicitly as multi-actor submissions
+  -- Amulet requires context (amulet-rules/open-round); fetch via RegistryApi and include DSO in readAs
+  aliceCtx <- RegistryApi.getAllocation_TransferContext amuletRegistry aliceAllocCid Api.Token.MetadataV1.emptyMetadata
+  let amuletExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = Api.Token.MetadataV1.emptyMetadata
+        context = aliceCtx.choiceContext
+
+  _ <- submitMulti [provider, alice, bob] [amuletRegistry.dso] $ exerciseCmd
+    aliceAllocCid
+    AllocationV1.Allocation_ExecuteTransfer with
+      extraArgs = amuletExtraArgs
+
+  -- USDC execution (no special context required)
+  let usdcExtraArgs = Api.Token.MetadataV1.ExtraArgs with
+        meta = tokenMeta
+        context = Api.Token.MetadataV1.emptyChoiceContext
+
+  _ <- submitMulti [provider, alice, bob] [] $ exerciseCmd
+    bobAllocCid
+    AllocationV1.Allocation_ExecuteTransfer with
+      extraArgs = usdcExtraArgs
+
+  -- Assertions: swapped holdings delivered
+  WalletClient.checkHoldingWithAmountExists alice instrumentId 20.0
+  WalletClient.checkHoldingWithAmountExists bob amuletId 100.0
+  pure ()

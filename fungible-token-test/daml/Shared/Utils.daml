@@ -1,0 +1,89 @@
+module Shared.Utils (
+  InitBalances(..),
+  TokenSetup(..),
+  AllocatedDvP(..),
+  setupToken,
+  balanceOf
+) where
+
+import Daml.Script
+import DA.Foldable (forA_)
+import DA.TextMap qualified as TextMap
+
+-- import Splice.Testing.Utils
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetaV1
+-- import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstrV1
+-- import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+
+import Fungible.TokenHolding
+import Fungible.TokenTransferFactory
+
+
+data InitBalances = InitBalances with
+  aliceAmts : [Decimal]
+  bobAmts : [Decimal]
+  charlieAmts : [Decimal]
+
+data TokenSetup = TokenSetup with
+  admin : Party
+  alice : Party
+  bob : Party
+  charlie : Party
+  instrumentId : HoldingV1.InstrumentId
+  tokenMeta : MetaV1.Metadata
+  transferFactoryCid : ContractId TokenTransferFactory
+
+data AllocatedDvP = AllocatedDvP 
+  with
+    alice : Party
+    bob : Party
+    provider : Party
+    now : Time
+    amuletRegistry : AmuletRegistry.AmuletRegistry
+    amuletId : HoldingV1.InstrumentId
+    fungibleId : HoldingV1.InstrumentId
+    fungibleMetadata : MetaV1.Metadata
+  deriving (Show, Eq)
+
+setupToken : Text -> Text -> InitBalances -> Script TokenSetup
+setupToken tokenId tokenAdmin InitBalances{..} = script do
+  admin <- allocatePartyByHint (PartyIdHint "fungible-admin")
+  alice <- allocatePartyByHint (PartyIdHint "alice")
+  bob <- allocatePartyByHint (PartyIdHint "bob")
+  charlie <- allocatePartyByHint (PartyIdHint "charlie")
+  
+  -- instrument id
+  -- let emptyMeta = MetaV1.emptyMetadata
+  now <- getTime
+  let tokenMeta = MetaV1.Metadata with
+        values = TextMap.fromList
+          [ 
+            ("name", tokenId),
+            ("symbol", tokenId),
+            ("issued-at", show now),
+            ("description", "Test Fungible Token " <> tokenId),
+            ("admin", tokenAdmin)
+          ]
+
+  let instrumentId = HoldingV1.InstrumentId with admin; id = tokenId
+  transferFactoryCid <- submit admin $ createCmd TokenTransferFactory with admin; meta = tokenMeta
+  
+  -- mint initial holdings
+  forA_ aliceAmts $ \amt -> submitMulti [admin, alice] [] $ createCmd TokenHolding with admin; owner = alice; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  forA_ bobAmts $ \amt -> submitMulti [admin, bob] [] $ createCmd TokenHolding with admin; owner = bob; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  forA_ charlieAmts $ \amt -> submitMulti [admin, charlie] [] $ createCmd TokenHolding with admin; owner = charlie; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  pure TokenSetup with ..
+
+
+balanceOf : Party -> HoldingV1.InstrumentId -> Script Decimal
+balanceOf p instrumentId = do
+  holdings <- queryInterface @HoldingV1.Holding p
+  let sameInstr = [ 
+          holdingView.amount | (_, Some holdingView) 
+            <- holdings, holdingView.instrumentId == instrumentId, holdingView.owner == p 
+        ]
+
+  pure (sum sameInstr)
