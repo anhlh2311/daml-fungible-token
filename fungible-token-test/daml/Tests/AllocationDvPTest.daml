@@ -168,6 +168,8 @@ testAllocationDvP = script do
   -- Execute both allocations (DvP)
   -- For Amulet allocation, fetch required OpenAPI context (amulet-rules, open-round)
   aliceCtx <- RegistryApi.getAllocation_TransferContext amuletRegistry aliceAllocCid Api.Token.MetadataV1.emptyMetadata
+  debug $ ">> Alice transfer context: " <> show aliceCtx.choiceContext
+  
   let aliceExtraArgs = Api.Token.MetadataV1.ExtraArgs with
         meta = Api.Token.MetadataV1.emptyMetadata
         context = aliceCtx.choiceContext

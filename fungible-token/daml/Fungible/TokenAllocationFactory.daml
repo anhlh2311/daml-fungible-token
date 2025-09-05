@@ -64,7 +64,6 @@ template TokenAllocationFactory
               expiresAfter = None
               context = Some (Text.implode ["allocation for transfer leg ", show arg.allocation.transferLegId, " to ", show arg.allocation.transferLeg.receiver])
         
-        debug $ "Creating locked holding for allocation: " <> show allocLock
         lockedCid <- create TokenHolding with
           admin = admin
           owner = arg.allocation.transferLeg.sender
