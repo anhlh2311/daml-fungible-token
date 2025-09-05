@@ -28,7 +28,7 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
     - `setupToken`: shared test setup for parties, instrument and initial issuances
     - Tests for two‑step accept/reject/withdraw, expired single‑step, update‑failure, wrong admin, insufficient balance
 
-- [external-test-sources/splice-token-standard-test](/external-test-sources/splice-token-standard-test) — upstream testing utilities and examples
+- [external-test-sources/splice-token-standard-test](/external-test-sources/splice-token-standard-test) — upstream testing utilities and examples (git submodule)
 
 ## Prerequisites
 
@@ -36,12 +36,33 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
   - [fungible-token/daml.yaml](/fungible-token/daml.yaml)
   - [fungible-token-test/daml.yaml](/fungible-token-test/daml.yaml)
 - Canton or Sandbox for running scripts (tests use in‑memory test runner).
+- Git with submodule support (`external-test-sources` are included as a git submodule).
+
+## Getting Started
+
+### Clone with Submodules
+
+When cloning this repository, make sure to include the submodules:
+
+```bash
+git clone --recursive https://github.com/YOUR_USERNAME/daml-fungible-token.git
+```
+
+If you've already cloned without submodules, initialize them:
+
+```bash
+git submodule update --init --recursive
+```
 
 ## Build
 
 From the repository root (multi-package):
 
 ```bash
+# First, ensure submodules are initialized
+git submodule update --init --recursive
+
+# Then build all packages
 daml build --all
 ```
 
@@ -198,6 +219,20 @@ sequenceDiagram
   - sender ≠ receiver ⇒ two‑step (`TokenTwoStepTransferInstruction`), with a pre‑locked holding
 
 - Tests are organized in [FungibleTokenTest.daml](/fungible-token-test/daml/FungibleTokenTest.daml). Use `setupToken` to initialize parties, an instrument and initial balances for each test.
+
+## External Test Sources
+
+The external test sources (`external-test-sources/`) are now managed as a separate repository and included as a git submodule. This provides better dependency management and allows the test utilities to be reused across multiple projects.
+
+### Quick Submodule Commands
+
+```bash
+# Update external test sources to latest version
+git submodule update --remote external-test-sources
+
+# Initialize submodules (if not already done)
+git submodule update --init --recursive
+```
 
 ## License
 

@@ -1,0 +1,7 @@
+# This file will be created automatically when you add the submodule
+# It shows the expected configuration for the external-test-sources submodule
+
+[submodule "external-test-sources"]
+	path = external-test-sources
+	url = https://github.com/YOUR_USERNAME/external-test-sources.git
+	branch = main

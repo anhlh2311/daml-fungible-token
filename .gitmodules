@@ -1,0 +1,3 @@
+[submodule "external-test-sources"]
+	path = external-test-sources
+	url = git@github.com:AngelhackDev/external-test-sources.git
