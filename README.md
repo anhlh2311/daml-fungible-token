@@ -45,7 +45,7 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
 When cloning this repository, make sure to include the submodules:
 
 ```bash
-git clone --recursive https://github.com/YOUR_USERNAME/daml-fungible-token.git
+git clone --recursive https://github.com/AngelhackDev/daml-fungible-token.git
 ```
 
 If you've already cloned without submodules, initialize them:
@@ -82,7 +82,7 @@ daml build
 
 ```bash
 cd fungible-token-test
-daml test --all
+daml test
 ```
 
 - Narrow to a specific file:
