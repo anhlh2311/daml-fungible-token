@@ -19,7 +19,6 @@ import Splice.Api.Token.MetadataV1 qualified as MetaV1
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 
 import Fungible.TokenMint
-import Fungible.TokenHolding
 import Fungible.TokenTransferFactory
 
 
