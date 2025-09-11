@@ -18,6 +18,7 @@ import Splice.Api.Token.MetadataV1 qualified as MetaV1
 
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 
+import Fungible.TokenMint
 import Fungible.TokenHolding
 import Fungible.TokenTransferFactory
 
@@ -72,9 +73,24 @@ setupToken tokenId tokenAdmin InitBalances{..} = script do
   transferFactoryCid <- submit admin $ createCmd TokenTransferFactory with admin; meta = tokenMeta
   
   -- mint initial holdings
-  forA_ aliceAmts $ \amt -> submitMulti [admin, alice] [] $ createCmd TokenHolding with admin; owner = alice; amount = amt; instrumentId; lock = None; meta = tokenMeta
-  forA_ bobAmts $ \amt -> submitMulti [admin, bob] [] $ createCmd TokenHolding with admin; owner = bob; amount = amt; instrumentId; lock = None; meta = tokenMeta
-  forA_ charlieAmts $ \amt -> submitMulti [admin, charlie] [] $ createCmd TokenHolding with admin; owner = charlie; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  -- forA_ aliceAmts $ \amt -> submitMulti [admin, alice] [] $ createCmd TokenHolding with admin; owner = alice; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  -- forA_ bobAmts $ \amt -> submitMulti [admin, bob] [] $ createCmd TokenHolding with admin; owner = bob; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  -- forA_ charlieAmts $ \amt -> submitMulti [admin, charlie] [] $ createCmd TokenHolding with admin; owner = charlie; amount = amt; instrumentId; lock = None; meta = tokenMeta
+  
+  -- create TokenMintRequest for each party
+  aliceMintRequests <- forA aliceAmts $ \amt -> submit alice $ createCmd TokenMintRequest with instrumentId; recipient = alice; amount = amt
+  bobMintRequests <- forA bobAmts $ \amt -> submit bob $ createCmd TokenMintRequest with instrumentId; recipient = bob; amount = amt
+  charlieMintRequests <- forA charlieAmts $ \amt -> submit charlie $ createCmd TokenMintRequest with instrumentId; recipient = charlie; amount = amt
+
+  -- Token Admin accept the mint requests
+  -- aliceHoldings <- forA aliceMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+  -- bobHoldings <- forA bobMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+  -- charlieHoldings <- forA charlieMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+
+  forA_ aliceMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+  forA_ bobMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+  forA_ charlieMintRequests $ \mintRequest -> submit admin $ exerciseCmd mintRequest AcceptMint
+  
   pure TokenSetup with ..
 
 
