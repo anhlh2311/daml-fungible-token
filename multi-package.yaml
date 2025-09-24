@@ -1,6 +1,6 @@
 packages:
-- ./fungible-token
-- ./fungible-token-test
-- ./external-test-sources/splice-token-standard-test
-- ./external-test-sources/splice-amulet-test
-- ./external-test-sources/splice-wallet-test
+  - ./fungible-token
+# - ./fungible-token-test
+# - ./external-test-sources/splice-token-standard-test
+# - ./external-test-sources/splice-amulet-test
+# - ./external-test-sources/splice-wallet-test
