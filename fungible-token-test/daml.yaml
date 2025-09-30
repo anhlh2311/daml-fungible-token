@@ -10,7 +10,7 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-  - ../fungible-token/.daml/dist/fungible-token-1.0.0.dar
+  - ../fungible-token/.daml/dist/fungible-token-1.0.2.dar
   - ../external-test-sources/dars/splice-api-token-holding-v1-1.0.0.dar
   - ../external-test-sources/dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../external-test-sources/dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
