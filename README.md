@@ -1,10 +1,12 @@
-# Fungible Token (CIP‑0056) on Canton
+# AngelHack
+
+## CIP-0056 Fungible Token DvP & Multi-Step Transfers
 
 This repository contains a minimal, standards‑compliant implementation of the Canton Network token standard CIP‑0056 for fungible tokens, plus a test package and example integration with the Splice Amulet reference.
 
 The code demonstrates both direct (single‑step) transfers and two‑step, pending‑acceptance transfers with pre‑locked inputs, as well as DvP allocations in line with the standard’s allocation APIs.
 
-## Status and compatibility
+### 1. Status and compatibility
 
 - **Interfaces implemented**: `HoldingV1`, `TransferInstructionV1` (`TransferFactory` + `TransferInstruction`), `AllocationInstructionV1` (`AllocationFactory`), `AllocationV1`.
 - **Two transfer modes**:
@@ -13,7 +15,7 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
 - **Metadata**: uses the open `MetadataV1` map; callers can set arbitrary token attributes (name, symbol, issued‑at, description, …).
 - **Reference**: The test sources include Splice Amulet modules to compare against the richer reference implementation (fees/rewards/etc.).
 
-## Repository layout
+### 2. Repository layout
 
 - [fungible-token](/fungible-token/) — main package implementing the CIP‑0056 interfaces
   - [daml/Fungible/TokenHolding.daml](/fungible-token/daml/Fungible/TokenHolding.daml)
@@ -30,7 +32,7 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
 
 - [external-test-sources/splice-token-standard-test](/external-test-sources/splice-token-standard-test) — upstream testing utilities and examples (git submodule)
 
-## Prerequisites
+### 3. Prerequisites
 
 - Daml SDK (as per package configs) — e.g. the snapshot in
   - [fungible-token/daml.yaml](/fungible-token/daml.yaml)
@@ -38,9 +40,9 @@ The code demonstrates both direct (single‑step) transfers and two‑step, pend
 - Canton or Sandbox for running scripts (tests use in‑memory test runner).
 - Git with submodule support (`external-test-sources` are included as a git submodule).
 
-## Getting Started
+### 4. Getting Started
 
-### Clone with Submodules
+#### Clone with Submodules
 
 When cloning this repository, make sure to include the submodules:
 
@@ -54,7 +56,7 @@ If you've already cloned without submodules, initialize them:
 git submodule update --init --recursive
 ```
 
-## Build
+### 5.  Build
 
 From the repository root (multi-package):
 
@@ -76,7 +78,7 @@ cd ../fungible-token-test
 daml build
 ```
 
-## Run tests
+### 6. Run tests
 
 - Run tests in the test DAR using the in‑memory test runner:
 
@@ -91,14 +93,14 @@ daml test
 daml test --files daml/FungibleTokenTest.daml
 ```
 
-## Concepts
+### 7. Concepts
 
-### Instrument
+#### a. Instrument
 
 - An instrument identifies a token type as `{ admin : Party, id : Text }` (see [HoldingV1](https://github.com/hyperledger-labs/splice/blob/main/token-standard/splice-api-token-holding-v1/daml/Splice/Api/Token/HoldingV1.daml)).
 - From the same code, multiple tokens (e.g., “USDC”, “USDT”) are created by using different `InstrumentId`s and admin parties.
 
-### Metadata
+#### b. Metadata
 
 - `MetadataV1` is an open key→value map (TextMap). You can attach business attributes such as name, symbol, issued‑at, description, etc., on factories, holdings, and results.
 - Example (caller‑provided):
@@ -115,14 +117,14 @@ let tokenMeta = M.Metadata with
         ]
 ```
 
-### Transfers
+#### c. Transfers
 
 - Single‑step (self‑transfers): [TokenTransferInstruction.daml](/fungible-token/daml/Fungible/TokenTransferInstruction.daml)
   - Inputs are validated and archived at accept time; sender change and receiver holdings are created immediately.
 - Two‑step (pending acceptance, sender ≠ receiver): [TwoStepTransferInstruction.daml](/fungible-token/daml/Fungible/TwoStepTransferInstruction.daml)
   - Inputs are aggregated, archived, and converted into a single locked holding at instruction creation; receiver later accepts (consumes lock, creates receiver holding) or rejects/withdraws (returns funds to sender).
 
-### DvP allocations
+#### d. DvP allocations
 
 - Lock funds into an allocation and settle/cancel/withdraw via [TokenAllocationFactory.daml](/fungible-token/daml/Fungible/TokenAllocationFactory.daml) and [TokenAllocation.daml](/fungible-token/daml/Fungible/TokenAllocation.daml).
 - **Purpose**: Reserve funds for multi‑party or cross‑asset trades so they can be settled atomically later (Delivery‑vs‑Payment). This splits a trade into a prepare phase (allocate/lock) and a settle phase (execute/cancel/withdraw).
@@ -133,9 +135,9 @@ let tokenMeta = M.Metadata with
   - **Withdraw/Cancel** consumes the locked holding and returns an unlocked holding to the sender.
 - **Benefits**: Ensures funds are pre‑funded and cannot be double‑spent while a trade is being coordinated; interoperable with CIP‑0056 `AllocationInstructionV1`/`AllocationV1` wallets and backends.
 
-## Usage examples
+### 8. Usage examples
 
-### Create a transfer instruction (factory call)
+#### Create a transfer instruction (factory call)
 
 ```haskell
 let extraArgs = MetaV1.ExtraArgs with
@@ -157,7 +159,7 @@ exerciseCmd (toInterfaceContractId @TransferInstrV1.TransferFactory transferFact
     extraArgs
 ```
 
-### Accept or reject a pending transfer
+#### Accept or reject a pending transfer
 
 ```haskell
 exerciseCmd instrCid TransferInstrV1.TransferInstruction_Accept with extraArgs
@@ -165,9 +167,9 @@ exerciseCmd instrCid TransferInstrV1.TransferInstruction_Accept with extraArgs
 exerciseCmd instrCid TransferInstrV1.TransferInstruction_Reject with extraArgs
 ```
 
-## Sequence diagrams
+### 9. Sequence diagrams
 
-### Two‑step transfer
+#### Two‑step transfer
 
 ```mermaid
 sequenceDiagram
@@ -191,7 +193,7 @@ sequenceDiagram
   deactivate F
 ```
 
-### Allocation (DvP) settlement
+#### Allocation (DvP) settlement
 
 ```mermaid
 sequenceDiagram
@@ -212,7 +214,7 @@ sequenceDiagram
   A-->>E: Allocation_ExecuteTransferResult
 ```
 
-## Development notes
+### 10. Development notes
 
 - Two‑step instruction creation lives in [TokenTransferFactory.daml](/fungible-token/daml/Fungible/TokenTransferFactory.daml). The factory decides between single‑step and two‑step:
   - sender == receiver ⇒ single‑step (`TokenTransferInstruction`)
@@ -220,11 +222,11 @@ sequenceDiagram
 
 - Tests are organized in [FungibleTokenTest.daml](/fungible-token-test/daml/FungibleTokenTest.daml). Use `setupToken` to initialize parties, an instrument and initial balances for each test.
 
-## External Test Sources
+### 11. External Test Sources
 
 The external test sources (`external-test-sources/`) are now managed as a separate repository and included as a git submodule. This provides better dependency management and allows the test utilities to be reused across multiple projects.
 
-### Quick Submodule Commands
+#### Quick Submodule Commands
 
 ```bash
 # Update external test sources to latest version
